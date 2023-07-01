@@ -1,14 +1,16 @@
+:- use_module(library(date)).
+:- use_module(library(odbc)).
 
-% Dados para conexÃ£o com o banco de dados
+% Dados para conexÃƒÂ£o com o banco de dados
 database('banco_prova2').
 username('root').
 password('123456').
 
-% FunÃ§Ã£o para conectar ao banco de dados
+% Função para conectar ao banco de dados
 conectar_banco :-
     odbc_connect('swiprolog', _, [user(root), password('123456'), alias(banco), open(once)]).
 
-% FunÃ§Ã£o para desconectar do banco de dados
+% Função para desconectar do banco de dados
 desconectar_banco :-
     odbc_disconnect('banco').
 
@@ -24,78 +26,121 @@ inserir_habilidade(Nome) :-
     writeln('Habilidade inserida com sucesso!').
 
 atribuir_habilidade_membro(IdMembro, IdHabilidade) :-
-    odbc_prepare('banco', 'INSERT INTO membro_habilidade(id_membro, id_habilidade) VALUES (?, ?)', [integer, integer], Statement),
+    odbc_prepare('banco', 'INSERT INTO membro_habilidade(id_membro, id_habilid) VALUES (?, ?)', [integer, integer], Statement),
     odbc_execute(Statement, [IdMembro, IdHabilidade]),
     writeln('Habilidade atribuída ao membro com sucesso!').
 
-criar_projeto(Nome, Descricao, DataInicio, DataFim) :-
-    odbc_prepare('banco', 'INSERT INTO projeto(nome, descric, data_ini, data_term) VALUES (?, ?, ?, ?)', [varchar, varchar, varchar, varchar], Statement),
-    odbc_execute(Statement, [Nome, Descricao, DataInicio, DataFim]),
+converter_data(Data, DataConvertida) :-
+    atomic_list_concat([Ano, Mes, Dia], '-', Data),
+    atom_number(Ano, AnoNum),
+    atom_number(Mes, MesNum),
+    atom_number(Dia, DiaNum),
+    DataConvertida = date(AnoNum, MesNum, DiaNum).
+
+criar_projeto(Nome, Descricao, DataInicio, DataFim, Status, Respons) :-
+    converter_data(DataInicio, DataInicioConvertida),
+    converter_data(DataFim, DataFimConvertida),
+    odbc_prepare('banco', 'INSERT INTO projeto(nome, descric, data_ini, data_term, status, respons) VALUES (?, ?, ?, ?, ?, ?)', [varchar, varchar, date, date, varchar, integer], Statement),
+    odbc_execute(Statement, [Nome, Descricao, DataInicioConvertida, DataFimConvertida, Status, Respons]),
     writeln('Projeto criado com sucesso!').
 
-adicionar_membro_projeto(IdMembro, IdProjeto, Banco) :-
-    odbc_prepare(Banco, 'INSERT INTO membros_projeto(id_membro, id_projeto) VALUES (?, ?)', [integer, integer], Statement),
+criar_documentacao(Descricao,ProjAssoc, Versao, DataCri, Nome) :-
+    converter_data(DataCri, DataCriConvertida),
+    odbc_prepare('banco', 'INSERT INTO documento (descric, id_proj, versao, data_cri, nome) VALUES (?, ?, ?, ?, ?)', [varchar, integer, integer, date, varchar], Statement),
+    odbc_execute(Statement, [Descricao, ProjAssoc, Versao, DataCriConvertida, Nome]),
+    writeln('Documentação criada com sucesso!').
+
+criar_relatorio(ProjAssoc, DataGen, Tipo) :-
+    converter_data(DataGen, DataGenConvertida),
+    odbc_prepare('banco', 'INSERT INTO relatorio (id_proj, data_ger, tipo) VALUES (?, ?, ?)', [integer, date, varchar], Statement),
+    odbc_execute(Statement, [ProjAssoc, DataGenConvertida, Tipo]),
+    writeln('Relatório criado com sucesso!').
+
+adicionar_membro_projeto(IdMembro, IdProjeto) :-
+    odbc_prepare('banco', 'INSERT INTO membros_projeto(id_membro, id_proj) VALUES (?, ?)', [integer, integer], Statement),
     odbc_execute(Statement, [IdMembro, IdProjeto]),
     writeln('Membro adicionado ao projeto com sucesso!').
 
-adicionar_tarefa_projeto(Descricao, IdProjeto, Banco) :-
-    odbc_prepare(Banco, 'INSERT INTO tarefa(descricao, id_projeto, status) VALUES (?, ?, ?)', [varchar, integer, varchar], Statement),
+adicionar_tarefa_projeto(Descricao, IdProjeto) :-
+    odbc_prepare('banco', 'INSERT INTO tarefa(descric, proj_assoc, status) VALUES (?, ?, ?)', [varchar, integer, varchar], Statement),
     odbc_execute(Statement, [Descricao, IdProjeto, 'Pendente']),
     writeln('Tarefa adicionada ao projeto com sucesso!').
 
-concluir_tarefa(IdTarefa, Banco) :-
-    odbc_prepare(Banco, 'UPDATE tarefa SET status = ? WHERE id = ?', [varchar, integer], Statement),
-    odbc_execute(Statement, ['Concluída', IdTarefa]),
-    writeln('Tarefa concluída com sucesso!').
+concluir_tarefa(IdTarefa) :-
+    odbc_prepare('banco', 'UPDATE tarefa SET status = ? WHERE id_taref = ?', [varchar, integer], Statement),
+    odbc_execute(Statement, ['ConcluÃ­da', IdTarefa]),
+    writeln('Tarefa concluÃ­da com sucesso!').
 
-% Funções para exibir dados do banco de dados
-exibir_membros_projeto(IdProj, Banco) :-
-    odbc_prepare(Banco, 'SELECT m.nome, m.funcao FROM membro m INNER JOIN membros_projetos mp ON m.id = mp.id_membro WHERE mp.id_projeto = ?', [integer], Statement),
+% FunÃ§Ãµes para exibir dados do banco de dados
+exibir_membros_projeto(IdProj) :-
+    odbc_prepare('banco', 'select distinct membro.nome FROM membros_projeto INNER JOIN membro ON membro.id_membro = membros_projeto.id_membro INNER JOIN projeto ON projeto.id_proj = membros_projeto.id_proj WHERE membros_projeto.id_proj = ?', [integer], Statement, [fetch(fetch)]),
     odbc_execute(Statement, [IdProj]),
     writeln('Membros do Projeto:'),
     exibir_resultado(Statement).
 
-exibir_tarefas_concluidas_projeto(IdProj, Banco) :-
-    odbc_prepare(Banco, 'SELECT descricao FROM tarefa WHERE id_projeto = ? AND status = ?', [integer, varchar], Statement),
-    odbc_execute(Statement, [IdProj, 'Concluída']),
-    writeln('Tarefas Concluídas do Projeto:'),
+exibir_tarefas_concluidas_projeto(IdProj) :-
+    odbc_prepare('banco', 'SELECT descric FROM tarefa WHERE proj_assoc = ? AND status = ?', [integer, varchar], Statement, [fetch(fetch)]),
+    odbc_execute(Statement, [IdProj, 'ConcluÃ­da']),
+    writeln('Tarefas ConcluÃ­das do Projeto:'),
     exibir_resultado(Statement).
 
-exibir_membros_com_habilidade(Habilidade, Banco) :-
-    odbc_prepare(Banco, 'SELECT m.nome FROM membro m INNER JOIN membros_habilidades mh ON m.id = mh.id_membro INNER JOIN habilidades h ON mh.id_habilidade = h.id WHERE h.nome = ?', [varchar], Statement),
+exibir_membros_com_habilidade(Habilidade) :-
+        odbc_prepare('banco', 'select distinct membro.nome FROM membro_habilidade INNER JOIN membro ON membro.id_membro = membro_habilidade.id_membro INNER JOIN habilidade ON habilidade.id_habilid = membro_habilidade.id_habilid WHERE habilidade.nome = ?', [varchar], Statement, [fetch(fetch)]),
     odbc_execute(Statement, [Habilidade]),
     writeln('Membros com a Habilidade:'),
     exibir_resultado(Statement).
 
-exibir_documentos_projeto(IdProj, Banco) :-
-    odbc_prepare(Banco, 'SELECT nome, descricao FROM documento WHERE id_projeto = ?', [integer], Statement),
+exibir_documentos_projeto(IdProj) :-
+    odbc_prepare('banco', 'SELECT nome, descric FROM documento WHERE id_proj = ?', [integer], Statement, [fetch(fetch)]),
     odbc_execute(Statement, [IdProj]),
     writeln('Documentos do Projeto:'),
     exibir_resultado(Statement).
 
-exibir_projetos_atrasados(Banco) :-
-    odbc_prepare(Banco, 'SELECT nome FROM projeto WHERE data_fim < CURRENT_DATE', [], Statement),
+exibir_projetos_atrasados() :-
+    odbc_prepare('banco', 'SELECT nome FROM projeto WHERE data_term < CURRENT_DATE', [], Statement, [fetch(fetch)]),
     odbc_execute(Statement, []),
     writeln('Projetos Atrasados:'),
     exibir_resultado(Statement).
 
-exibir_resultado(Statement) :-
-    odbc_fetch(Statement, Row),
-    exibir_row(Row),
+exibir_membros :-
+    odbc_prepare('banco', 'SELECT nome FROM membro', [], Statement, [fetch(fetch)]),
+    odbc_execute(Statement, []),
+    writeln('Lista de Membros:'),
     exibir_resultado(Statement).
 
-exibir_resultado(_) :-
-    nl.
+exibir_habilidades :-
+    odbc_prepare('banco', 'SELECT nome FROM habilidade', [], Statement, [fetch(fetch)]),
+    odbc_execute(Statement, []),
+    writeln('Lista de Habilidades:'),
+    exibir_resultado(Statement).
 
-exibir_row(Row) :-
-    odbc_column_table(Row, Table),
-    exibir_columns(Row, Table).
+exibir_projetos :-
+    odbc_prepare('banco', 'SELECT nome FROM projeto', [], Statement, [fetch(fetch)]),
+    odbc_execute(Statement, []),
+    writeln('Lista de Projetos:'),
+    exibir_resultado(Statement).
 
-exibir_columns(_, []).
-exibir_columns(Row, [Col | Cols]) :-
-    odbc_column(Row, Col, Value),
-    write(Col), write(': '), writeln(Value),
-    exibir_columns(Row, Cols).
+exibir_tarefas :-
+    odbc_prepare('banco', 'SELECT descric FROM tarefa', [], Statement, [fetch(fetch)]),
+    odbc_execute(Statement, []),
+    writeln('Lista de Tarefas:'),
+    exibir_resultado(Statement).
+
+
+exibir_resultado(Statement) :-
+    odbc_fetch(Statement, Row, []),
+    (   Row == end_of_file
+    ->  true
+    ;   Row =.. [_|Args],
+        writeln_list(Args),
+        exibir_resultado(Statement)
+    ).
+
+writeln_list([]).
+
+writeln_list([H|T]) :-
+    writeln(H),
+    writeln_list(T).
 
 % Função para exibir o menu
 menu :-
@@ -104,15 +149,21 @@ menu :-
     writeln('2. Inserir habilidade'),
     writeln('3. Atribuir habilidade a membro'),
     writeln('4. Criar projeto'),
-    writeln('5. Adicionar membro ao projeto'),
-    writeln('6. Adicionar tarefa ao projeto'),
-    writeln('7. Concluir tarefa'),
-    writeln('8. Exibir membros de um projeto'),
-    writeln('9. Exibir tarefas concluídas de um projeto'),
-    writeln('10. Exibir membros com uma habilidade específica'),
-    writeln('11. Exibir documentos de um projeto'),
-    writeln('12. Exibir projetos atrasados'),
-    writeln('13. Sair'),
+    writeln('5. Criar relatório'),
+    writeln('6. Criar documentação'),
+    writeln('7. Adicionar membro ao projeto'),
+    writeln('8. Adicionar tarefa ao projeto'),
+    writeln('9. Concluir tarefa'),
+    writeln('10. Exibir todos os membros'),
+    writeln('11. Exibir todas as habilidades'),
+    writeln('12. Exibir todos os projetos'),
+    writeln('13. Exibir todas as tarefas'),
+    writeln('14. Exibir membros de um projeto'),
+    writeln('15. Exibir tarefas concluídas de um projeto'),
+    writeln('16. Exibir membros com uma habilidade especÃ­fica'),
+    writeln('17. Exibir documentos de um projeto'),
+    writeln('18. Exibir projetos atrasados'),
+    writeln('19. Sair'),
     writeln('======================='),
     read(Opcao),
     executar_opcao(Opcao).
@@ -149,80 +200,131 @@ executar_opcao(4) :-
     read(Nome),
     writeln('Informe a descrição do projeto:'),
     read(Descricao),
-    writeln('Informe a data de início do projeto (formato: YYYY-MM-DD):'),
+    writeln('Informe a data de iní­cio do projeto (formato: YYYY-MM-DD):'),
     read(DataInicio),
     writeln('Informe a data de fim do projeto (formato: YYYY-MM-DD):'),
     read(DataFim),
-    criar_projeto(Nome, Descricao, DataInicio, DataFim),
+    writeln('Informe o status do projeto (em andamento, concluído, cancelado):'),
+    read(Status),
+    writeln('Informe o responsável do projeto:'),
+    read(Respons),
+    criar_projeto(Nome, Descricao, DataInicio, DataFim, Status, Respons),
     menu.
 
-executar_opcao(5, Banco) :-
+executar_opcao(5) :-
+    % Criar relatorio
+    writeln('Informe o projeto associado :'),
+    read(ProjAssoc),
+    writeln('Informe a data de geração (formato: YYYY-MM-DD):'),
+    read(DataGen),
+    writeln('Informe o tipo de relatório:'),
+    read(Tipo),
+    criar_relatorio(ProjAssoc, DataGen,Tipo),
+    menu.
+
+
+executar_opcao(6) :-
+    % Criar documentação
+    writeln('Informe a descrição da documentação:'),
+    read(Descricao),
+    writeln('Informe o projeto associado:'),
+    read(ProjAssoc),
+    writeln('Informe a versao:'),
+    read(Versao),
+    writeln('Informe a data de criação:'),
+    read(DataCri),
+    writeln('Informe o nome do documento:'),
+    read(Nome),
+    criar_documentacao(Descricao, ProjAssoc, Versao, DataCri, Nome),
+    menu.
+
+executar_opcao(7) :-
     % Adicionar membro ao projeto
     writeln('Informe o ID do membro:'),
     read(IdMembro),
     writeln('Informe o ID do projeto:'),
     read(IdProjeto),
-    adicionar_membro_projeto(IdMembro, IdProjeto, Banco),
-    menu(Banco).
+    adicionar_membro_projeto(IdMembro, IdProjeto),
+    menu.
 
-executar_opcao(6, Banco) :-
+executar_opcao(8) :-
     % Adicionar tarefa ao projeto
     writeln('Informe a descrição da tarefa:'),
     read(Descricao),
     writeln('Informe o ID do projeto:'),
     read(IdProjeto),
-    adicionar_tarefa_projeto(Descricao, IdProjeto, Banco),
-    menu(Banco).
+    adicionar_tarefa_projeto(Descricao, IdProjeto),
+    menu.
 
-executar_opcao(7, Banco) :-
+executar_opcao(9) :-
     % Concluir tarefa
     writeln('Informe o ID da tarefa:'),
     read(IdTarefa),
-    concluir_tarefa(IdTarefa, Banco),
-    menu(Banco).
+    concluir_tarefa(IdTarefa),
+    menu.
 
-executar_opcao(8, Banco) :-
+executar_opcao(10) :-
+    % Exibir todos os membros
+    exibir_membros,
+    menu.
+
+executar_opcao(11) :-
+    % Exibir todas as habilidades
+    exibir_habilidades,
+    menu.
+
+executar_opcao(12) :-
+    % Exibir todos os projetos
+    exibir_projetos,
+    menu.
+
+executar_opcao(13) :-
+    % Exibir todas as tarefas
+    exibir_tarefas,
+    menu.
+
+executar_opcao(14) :-
     % Exibir membros de um projeto
     writeln('Informe o ID do projeto:'),
     read(IdProj),
-    exibir_membros_projeto(IdProj, Banco),
-    menu(Banco).
+    exibir_membros_projeto(IdProj),
+    menu.
 
-executar_opcao(9, Banco) :-
+executar_opcao(15) :-
     % Exibir tarefas concluídas de um projeto
     writeln('Informe o ID do projeto:'),
     read(IdProj),
-    exibir_tarefas_concluidas_projeto(IdProj, Banco),
-    menu(Banco).
+    exibir_tarefas_concluidas_projeto(IdProj),
+    menu.
 
-executar_opcao(10, Banco) :-
-    % Exibir membros com uma habilidade específica
+executar_opcao(16) :-
+    % Exibir membros com uma habilidade especí­fica
     writeln('Informe a habilidade:'),
     read(Habilidade),
-    exibir_membros_com_habilidade(Habilidade, Banco),
-    menu(Banco).
+    exibir_membros_com_habilidade(Habilidade),
+    menu.
 
-executar_opcao(11, Banco) :-
+executar_opcao(17) :-
     % Exibir documentos de um projeto
     writeln('Informe o ID do projeto:'),
     read(IdProj),
-    exibir_documentos_projeto(IdProj, Banco),
-    menu(Banco).
+    exibir_documentos_projeto(IdProj),
+    menu.
 
-executar_opcao(12, Banco) :-
+executar_opcao(18) :-
     % Exibir projetos atrasados
-    exibir_projetos_atrasados(Banco),
-    menu(Banco).
+    exibir_projetos_atrasados(),
+    menu.
 
-executar_opcao(13, Banco) :-
+executar_opcao(19) :-
     % Sair
-    desconectar_banco(Banco),
+    desconectar_banco,
     writeln('Encerrando...').
 
-executar_opcao(_, Banco) :-
+executar_opcao(_) :-
     % Opção inválida
     writeln('Opção inválida!'),
-    menu(Banco).
+    menu.
 
 % Função principal
 :- initialization main.
@@ -230,4 +332,3 @@ executar_opcao(_, Banco) :-
 main :-
     conectar_banco(Banco),
     menu(Banco).
-
