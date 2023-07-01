@@ -102,6 +102,12 @@ exibir_projetos_atrasados() :-
     writeln('Projetos Atrasados:'),
     exibir_resultado(Statement).
 
+exibir_projetos_em_andamento :-
+    odbc_prepare('banco', 'SELECT nome FROM projeto WHERE status = ?', [varchar], Statement, [fetch(fetch)]),
+    odbc_execute(Statement, ['em andamento']),
+    writeln('Projetos em andamento:'),
+    exibir_resultado(Statement).
+
 exibir_membros :-
     odbc_prepare('banco', 'SELECT nome FROM membro', [], Statement, [fetch(fetch)]),
     odbc_execute(Statement, []),
@@ -158,12 +164,13 @@ menu :-
     writeln('11. Exibir todas as habilidades'),
     writeln('12. Exibir todos os projetos'),
     writeln('13. Exibir todas as tarefas'),
-    writeln('14. Exibir membros de um projeto'),
-    writeln('15. Exibir tarefas concluídas de um projeto'),
-    writeln('16. Exibir membros com uma habilidade especÃ­fica'),
-    writeln('17. Exibir documentos de um projeto'),
-    writeln('18. Exibir projetos atrasados'),
-    writeln('19. Sair'),
+    writeln('14. Exibir projetos em andamento no momento'),
+    writeln('15. Exibir membros de um projeto'),
+    writeln('16. Exibir tarefas concluídas de um projeto'),
+    writeln('17. Exibir membros com uma habilidade especÃ­fica'),
+    writeln('18. Exibir documentos de um projeto'),
+    writeln('19. Exibir projetos atrasados'),
+    writeln('20. Sair'),
     writeln('======================='),
     read(Opcao),
     executar_opcao(Opcao).
@@ -284,39 +291,44 @@ executar_opcao(13) :-
     menu.
 
 executar_opcao(14) :-
+    % Exibir projetos em andamento
+    exibir_projetos_em_andamento,
+    menu.
+
+executar_opcao(15) :-
     % Exibir membros de um projeto
     writeln('Informe o ID do projeto:'),
     read(IdProj),
     exibir_membros_projeto(IdProj),
     menu.
 
-executar_opcao(15) :-
+executar_opcao(16) :-
     % Exibir tarefas concluídas de um projeto
     writeln('Informe o ID do projeto:'),
     read(IdProj),
     exibir_tarefas_concluidas_projeto(IdProj),
     menu.
 
-executar_opcao(16) :-
+executar_opcao(17) :-
     % Exibir membros com uma habilidade especí­fica
     writeln('Informe a habilidade:'),
     read(Habilidade),
     exibir_membros_com_habilidade(Habilidade),
     menu.
 
-executar_opcao(17) :-
+executar_opcao(18) :-
     % Exibir documentos de um projeto
     writeln('Informe o ID do projeto:'),
     read(IdProj),
     exibir_documentos_projeto(IdProj),
     menu.
 
-executar_opcao(18) :-
+executar_opcao(19) :-
     % Exibir projetos atrasados
     exibir_projetos_atrasados(),
     menu.
 
-executar_opcao(19) :-
+executar_opcao(20) :-
     % Sair
     desconectar_banco,
     writeln('Encerrando...').
