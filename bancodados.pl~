@@ -80,7 +80,7 @@ exibir_membros_projeto(IdProj) :-
 
 exibir_tarefas_concluidas_projeto(IdProj) :-
     odbc_prepare('banco', 'SELECT descric FROM tarefa WHERE proj_assoc = ? AND status = ?', [integer, varchar], Statement, [fetch(fetch)]),
-    odbc_execute(Statement, [IdProj, 'Concluida']),
+    odbc_execute(Statement, [IdProj, 'ConcluÃ­da']),
     writeln('Tarefas Conclu�das do Projeto:'),
     exibir_resultado(Statement).
 
