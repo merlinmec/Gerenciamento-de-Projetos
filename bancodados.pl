@@ -97,7 +97,7 @@ exibir_documentos_projeto(IdProj) :-
     exibir_resultado(Statement).
 
 exibir_projetos_atrasados() :-
-    odbc_prepare('banco', 'SELECT nome FROM projeto WHERE data_term < CURRENT_DATE', [], Statement, [fetch(fetch)]),
+    odbc_prepare('banco', 'SELECT nome FROM projeto WHERE data_term < CURRENT_DATE AND status = "em andamento" ', [], Statement, [fetch(fetch)]),
     odbc_execute(Statement, []),
     writeln('Projetos Atrasados:'),
     exibir_resultado(Statement).
